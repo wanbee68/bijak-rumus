@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    font-family: "Plus Jakarta Sans", sans-serif;
+  }
+}
+
+.mode-btn { transition: all 0.3s ease; }
+.mode-btn:hover { transform: translateY(-2px); }
+.set-btn.completed { background-color: #86efac; border-color: #22c55e; }
+.set-btn.active { background-color: #3b82f6; color: white; }
+canvas { border: 2px solid #e5e7eb; border-radius: 8px; cursor: crosshair; }
+.highlight-yellow { background-color: #fef08a; padding: 2px; }
+
+@media print {
+  .no-print { display: none !important; }
+}

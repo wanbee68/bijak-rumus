@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "A student registered in the system",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the student" },
+        "ic": { "type": "string", "description": "IC number or student ID" },
+        "class": { "type": "string", "description": "Class name" },
+        "password": { "type": "string", "description": "Login password" }
+      },
+      "required": ["name", "ic", "class", "password"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "An exercise set for Rumusan",
+      "type": "object",
+      "properties": {
+        "setNumber": { "type": "number", "description": "Set number (1-30)" },
+        "instruction": { "type": "string", "description": "Instruction for the exercise" },
+        "text1": { "type": "string", "description": "Bahan 1: Petikan text" },
+        "image2": { "type": "string", "description": "Bahan 2: Image URL" },
+        "image3": { "type": "string", "description": "Bahan 3: Image URL" }
+      },
+      "required": ["setNumber", "instruction", "text1"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "A student's submission for a question set",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "description": "UID of the student" },
+        "studentName": { "type": "string", "description": "Name of the student" },
+        "studentClass": { "type": "string", "description": "Class of the student" },
+        "setNumber": { "type": "number", "description": "Set number" },
+        "content": { "type": "string", "description": "The summary text submitted" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Submission time" }
+      },
+      "required": ["studentId", "setNumber", "content", "timestamp"]
+    },
+    "Mark": {
+      "title": "Mark",
+      "description": "Grading for a student's answer",
+      "type": "object",
+      "properties": {
+        "answerId": { "type": "string", "description": "ID of the answer being graded" },
+        "studentId": { "type": "string", "description": "UID of the student" },
+        "setNumber": { "type": "number", "description": "Set number" },
+        "p": { "type": "number" },
+        "a": { "type": "number" },
+        "b": { "type": "number" },
+        "c": { "type": "number" },
+        "d": { "type": "number" },
+        "e": { "type": "number" },
+        "k": { "type": "number" },
+        "ideaTotal": { "type": "number" },
+        "bahMark": { "type": "number" },
+        "grandTotal": { "type": "number" }
+      },
+      "required": ["answerId", "studentId", "setNumber", "grandTotal"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of students"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Collection of exercise sets"
+    },
+    "/answers/{answerId}": {
+      "schema": "Answer",
+      "description": "Collection of student submissions"
+    },
+    "/marks/{markId}": {
+      "schema": "Mark",
+      "description": "Collection of grades"
+    }
+  }
+}

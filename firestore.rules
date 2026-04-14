@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: students
+    // Document ID: studentId (UID)
+    // Fields:
+    //   - name: string (required)
+    //   - ic: string (required)
+    //   - class: string (required)
+    //   - password: string (required)
+    //
+    // Collection: questions
+    // Document ID: questionId
+    // Fields:
+    //   - setNumber: number (required)
+    //   - instruction: string (required)
+    //   - text1: string (required)
+    //   - image2: string (optional)
+    //   - image3: string (optional)
+    //
+    // Collection: answers
+    // Document ID: answerId
+    // Fields:
+    //   - studentId: string (required)
+    //   - studentName: string (required)
+    //   - studentClass: string (required)
+    //   - setNumber: number (required)
+    //   - content: string (required)
+    //   - timestamp: string (required, ISO 8601)
+    //
+    // Collection: marks
+    // Document ID: markId
+    // Fields:
+    //   - answerId: string (required)
+    //   - studentId: string (required)
+    //   - setNumber: number (required)
+    //   - grandTotal: number (required)
+    //   ... other numeric fields
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // For this prototype, we consider all authenticated users as admins 
+      // because the app uses anonymous login for both students and gurus.
+      // In a production app, you would use custom claims or a dedicated 
+      // 'admins' collection to verify guru status.
+      return isAuthenticated();
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidStudent(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.ic is string && data.ic.size() > 0 && data.ic.size() < 20 &&
+             data.class is string && data.class.size() > 0 && data.class.size() < 20 &&
+             data.password is string && data.password.size() > 0 && data.password.size() < 50;
+    }
+
+    function isValidQuestion(data) {
+      return data.setNumber is number && data.setNumber >= 1 && data.setNumber <= 30 &&
+             data.instruction is string &&
+             data.text1 is string;
+    }
+
+    function isValidAnswer(data) {
+      return data.studentId is string &&
+             data.setNumber is number &&
+             data.content is string && data.content.size() < 2000 &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidMark(data) {
+      return data.answerId is string &&
+             data.studentId is string &&
+             data.setNumber is number &&
+             data.grandTotal is number && data.grandTotal >= 0 && data.grandTotal <= 30;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidStudent(request.resource.data) && !('role' in request.resource.data);
+      allow update: if isAuthenticated() && isValidStudent(request.resource.data) && (isOwner(studentId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      // Allow authenticated users to manage questions for now to enable the Guru panel
+      // while we are in the prototype phase.
+      allow create, update: if isAuthenticated() && isValidQuestion(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /answers/{answerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidAnswer(request.resource.data) && 
+                    answerId == "ans_" + request.resource.data.studentId + "_" + string(request.resource.data.setNumber);
+      allow delete: if isAdmin();
+    }
+
+    match /marks/{markId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidMark(request.resource.data);
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
