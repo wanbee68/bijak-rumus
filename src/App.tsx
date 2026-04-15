@@ -310,6 +310,33 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setView('selection');
+    
+    // Reset Student Login Form
+    setPelajarNama('');
+    setPelajarPass('');
+    
+    // Reset Guru Login Form
+    setGuruPass('');
+    
+    // Reset Student Dashboard States
+    setJawapanText('');
+    setWordCount(0);
+    setCurrentSet(null);
+    setActiveTab('kerja');
+    
+    // Reset Guru Dashboard States
+    setGuruSetNum('');
+    setGuruArahan('');
+    setGuruBahan1('');
+    setGuruBahan2('');
+    setGuruBahan3('');
+    setImportArea('');
+    setPenandaPelajar('');
+    setPenandaSet('');
+    setMarkingSession(null);
+    setMarksInput({ p: 0, a: 0, b: 0, c: 0, d: 0, e: 0, k: 0, bah: 0 });
+    setActiveGuruTab('daftar');
+
     localStorage.removeItem('bijak_rumus_view');
     localStorage.removeItem('bijak_rumus_user');
     localStorage.removeItem('bijak_rumus_active_tab');
