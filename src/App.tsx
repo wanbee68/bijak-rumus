@@ -278,6 +278,9 @@ export default function App() {
       if (fallback) {
         student = { id: fallback.ic, name: fallback.nama, ic: fallback.ic, class: fallback.form, password: fallback.ic };
       }
+    } else {
+      // Ensure we use IC as ID even if found in Firestore
+      student = { ...student, id: student.ic };
     }
 
     if (!student) return showToast("Nama tidak dijumpai!", "bg-red-500");
@@ -372,7 +375,9 @@ export default function App() {
     try {
       for (const line of lines) {
         const [nama, ic, huruf, form] = line.split('\t');
-        await addDoc(collection(db, 'students'), {
+        if (!nama || !ic) continue;
+        // Use IC as document ID for consistency
+        await setDoc(doc(db, 'students', ic), {
           name: nama,
           ic: ic,
           class: form,
@@ -382,6 +387,7 @@ export default function App() {
       showToast("Import berjaya!", "bg-green-600");
       setImportArea('');
     } catch (e) {
+      console.error("Import error:", e);
       showToast("Gagal mengimport!", "bg-red-500");
     }
   };
@@ -457,7 +463,8 @@ export default function App() {
     };
 
     try {
-      await addDoc(collection(db, 'marks'), payload);
+      // Use setDoc with a fixed ID to prevent duplicate marks for the same answer
+      await setDoc(doc(db, 'marks', `mark_${markingSession.id}`), payload);
       showToast("Markah disimpan!", "bg-green-600");
       setMarkingSession(null);
     } catch (e) {
@@ -904,14 +911,19 @@ export default function App() {
                  <div className="space-y-6">
                     <h3 className="text-xl font-bold">Penandaan Rumusan</h3>
                     <div className="flex gap-4">
-                       <select 
-                        value={penandaPelajar}
-                        onChange={(e) => setPenandaPelajar(e.target.value)}
-                        className="flex-1 p-3 border rounded-lg"
-                       >
-                         <option value="">Pilih Pelajar</option>
-                         {students.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                       </select>
+                        <select 
+                         value={penandaPelajar}
+                         onChange={(e) => setPenandaPelajar(e.target.value)}
+                         className="flex-1 p-3 border rounded-lg"
+                        >
+                          <option value="">Pilih Pelajar</option>
+                          {Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]))
+                            .sort((a, b) => a.localeCompare(b))
+                            .map(name => (
+                              <option key={name} value={name}>{name}</option>
+                            ))
+                          }
+                        </select>
                        <select 
                         value={penandaSet}
                         onChange={(e) => setPenandaSet(e.target.value)}
@@ -957,6 +969,48 @@ export default function App() {
                     )}
                  </div>
                )}
+                {activeGuruTab === 'analisis' && (
+                  <div className="space-y-6">
+                    <h3 className="text-xl font-bold">Analisis Tahap Penguasaan (TP)</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="p-2 border">Nama Pelajar</th>
+                            {Array.from({ length: 10 }, (_, i) => i + 1).map(set => (
+                              <th key={set} className="p-2 border text-center">Set {set}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]))
+                            .sort((a, b) => a.localeCompare(b))
+                            .map(name => {
+                              const studentId = students.find(s => s.name === name)?.ic || ALL_STUDENTS_DATA.find(s => s.nama === name)?.ic;
+                              return (
+                                <tr key={name} className="hover:bg-gray-50">
+                                  <td className="p-2 border font-medium">{name}</td>
+                                  {Array.from({ length: 10 }, (_, i) => i + 1).map(set => {
+                                    const mark = marks.find(m => m.studentId === studentId && m.setNumber === set);
+                                    return (
+                                      <td key={set} className="p-2 border text-center">
+                                        {mark ? (
+                                          <span className={`font-bold ${mark.grandTotal >= 24 ? 'text-green-600' : mark.grandTotal >= 15 ? 'text-blue-600' : 'text-red-600'}`}>
+                                            {mark.grandTotal}
+                                          </span>
+                                        ) : '-'}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
         </div>
