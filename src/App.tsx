@@ -180,7 +180,16 @@ export default function App() {
   const [penandaPelajar, setPenandaPelajar] = useState('');
   const [penandaSet, setPenandaSet] = useState('');
   const [markingSession, setMarkingSession] = useState<any>(null);
-  const [marksInput, setMarksInput] = useState({ p: 0, a: 0, b: 0, c: 0, d: 0, e: 0, k: 0, bah: 0 });
+  const [marksInput, setMarksInput] = useState({ 
+    pend: 0, 
+    f1b1: 0, 
+    f1b2: 0, 
+    f2b1: 0, 
+    f2b2: 0, 
+    f2b3: 0, 
+    kes: 0, 
+    bah: 0 
+  });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -334,7 +343,16 @@ export default function App() {
     setPenandaPelajar('');
     setPenandaSet('');
     setMarkingSession(null);
-    setMarksInput({ p: 0, a: 0, b: 0, c: 0, d: 0, e: 0, k: 0, bah: 0 });
+    setMarksInput({ 
+      pend: 0, 
+      f1b1: 0, 
+      f1b2: 0, 
+      f2b1: 0, 
+      f2b2: 0, 
+      f2b3: 0, 
+      kes: 0, 
+      bah: 0 
+    });
     setActiveGuruTab('daftar');
 
     localStorage.removeItem('bijak_rumus_view');
@@ -345,12 +363,12 @@ export default function App() {
 
   const selectSet = (num: number) => {
     setCurrentSet(num);
-    const q = questions.find(item => item.setNumber === num);
+    const q = questions.find(item => Number(item.setNumber) === Number(num));
     if (!q) {
       setJawapanText('');
     } else {
       // Check if already answered
-      const existing = answers.find(a => a.studentId === currentUser.id && a.setNumber === num);
+      const existing = answers.find(a => a.studentId === currentUser.id && Number(a.setNumber) === Number(num));
       setJawapanText(existing ? existing.content : '');
     }
   };
@@ -475,16 +493,19 @@ export default function App() {
   };
 
   const handleSaveMarkah = async () => {
-    const { p, a, b, c, d, e, k, bah } = marksInput;
-    const ideaTotal = (p + a + b + c + d + e + k) * 2;
-    const grandTotal = Math.min(ideaTotal + bah, 30);
+    const { pend, f1b1, f1b2, f2b1, f2b2, f2b3, kes, bah } = marksInput;
+    const totalIsi = f1b1 + f1b2 + f2b1 + f2b2 + f2b3;
+    const isiMarkah = Math.min(totalIsi, 8) * 2;
+    const totalIsiPlusPendKes = pend + isiMarkah + kes;
+    const grandTotal = Math.min(totalIsiPlusPendKes + bah, 30);
     
     const payload = {
       answerId: markingSession.id,
       studentId: markingSession.studentId,
       setNumber: markingSession.setNumber,
-      p, a, b, c, d, e, k,
-      ideaTotal,
+      marks: marksInput, // Save the detailed breakdown
+      isiTotal: totalIsi,
+      isiMarkah: isiMarkah,
       bahMark: bah,
       grandTotal
     };
@@ -640,46 +661,93 @@ export default function App() {
 
             {activeTab === 'kerja' ? (
               <div className="space-y-6">
+                {questions.length === 0 && (
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl mb-4">
+                    <p className="text-amber-700 text-sm font-bold">⚠️ Belum Ada Soalan</p>
+                    <p className="text-amber-600 text-xs">Guru belum memuat naik sebarang set soalan. Sila hubungi guru anda.</p>
+                  </div>
+                )}
+                
                 <div className="bg-white rounded-2xl p-6 shadow-sm">
                   <h3 className="font-bold mb-4 text-gray-800">Pilih Set Latihan:</h3>
                   <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
-                      <button 
-                        key={num}
-                        onClick={() => selectSet(num)}
-                        className={`w-10 h-10 flex items-center justify-center font-bold border-2 rounded-lg text-sm transition-all ${currentSet === num ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:border-indigo-300'}`}
-                      >
-                        {num}
-                      </button>
-                    ))}
+                    {Array.from({ length: 30 }, (_, i) => i + 1).map(num => {
+                      const hasQuestion = questions.some(q => Number(q.setNumber) === num);
+                      const isSelected = currentSet === num;
+                      const isAnswered = answers.some(a => a.studentId === currentUser.id && Number(a.setNumber) === num);
+                      
+                      return (
+                        <button 
+                          key={num}
+                          onClick={() => selectSet(num)}
+                          className={`w-10 h-10 flex flex-col items-center justify-center font-bold border-2 rounded-lg text-xs transition-all relative ${
+                            isSelected 
+                              ? 'bg-indigo-600 text-white border-indigo-600' 
+                              : hasQuestion 
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:border-indigo-400' 
+                                : 'bg-white border-gray-100 text-gray-300 hover:border-gray-300'
+                          }`}
+                        >
+                          {num}
+                          {isAnswered && !isSelected && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
+                  {!currentSet && (
+                    <div className="mt-6 p-10 border-2 border-dashed border-indigo-100 rounded-2xl text-center">
+                      <p className="text-indigo-400 font-medium">Sila pilih nombor set di atas untuk mula menjawab.</p>
+                      <p className="text-xs text-indigo-300 mt-1">Set yang berwarna biru mempunyai soalan.</p>
+                    </div>
+                  )}
                 </div>
 
                 {currentSet && (
-                  <div className="space-y-6">
+                  <div className="space-y-6 animate-in fade-in duration-500">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <div className="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
-                          <h4 className="font-bold text-blue-700 mb-1">ARAHAN:</h4>
-                          <p className="text-gray-700 text-sm italic">{questions.find(q => q.setNumber === currentSet)?.instruction || 'Tiada arahan disediakan.'}</p>
+                          <h4 className="font-bold text-blue-700 mb-1 text-sm uppercase tracking-wider">ARAHAN:</h4>
+                          <p className="text-gray-700 text-sm italic">
+                            {questions.find(q => Number(q.setNumber) === Number(currentSet))?.instruction || 'Tiada arahan disediakan untuk set ini.'}
+                          </p>
                         </div>
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                          <h4 className="font-bold text-gray-800 mb-3 border-b pb-2">BAHAN 1: PETIKAN</h4>
+                          <h4 className="font-bold text-gray-800 mb-3 border-b pb-2 flex justify-between items-center text-sm uppercase tracking-wider">
+                            <span>BAHAN 1: PETIKAN</span>
+                            <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">Set {currentSet}</span>
+                          </h4>
                           <div className="text-gray-700 leading-relaxed text-sm whitespace-pre-wrap">
-                            {questions.find(q => q.setNumber === currentSet)?.text1 || 'Soalan belum sedia.'}
+                            {questions.find(q => Number(q.setNumber) === Number(currentSet))?.text1 || 'Soalan bagi set ini belum sedia atau belum dimuat naik oleh guru.'}
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                           <div className="bg-white p-4 rounded-2xl border">
-                              <h4 className="text-xs font-bold text-gray-400 mb-2">BAHAN 2</h4>
-                              {questions.find(q => q.setNumber === currentSet)?.image2 && (
-                                <img src={questions.find(q => q.setNumber === currentSet).image2} className="w-full rounded shadow-sm" />
+                           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                              <h4 className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">BAHAN 2</h4>
+                              {questions.find(q => Number(q.setNumber) === Number(currentSet))?.image2 ? (
+                                <img 
+                                  src={questions.find(q => Number(q.setNumber) === Number(currentSet)).image2} 
+                                  className="w-full rounded shadow-sm hover:scale-[1.02] transition-transform cursor-pointer" 
+                                  onClick={() => window.open(questions.find(q => Number(q.setNumber) === Number(currentSet)).image2, '_blank')}
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="h-32 bg-gray-50 rounded border border-dashed flex items-center justify-center text-gray-300 text-[10px]">Tiada Imej</div>
                               )}
                            </div>
-                           <div className="bg-white p-4 rounded-2xl border">
-                              <h4 className="text-xs font-bold text-gray-400 mb-2">BAHAN 3</h4>
-                              {questions.find(q => q.setNumber === currentSet)?.image3 && (
-                                <img src={questions.find(q => q.setNumber === currentSet).image3} className="w-full rounded shadow-sm" />
+                           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                              <h4 className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">BAHAN 3</h4>
+                              {questions.find(q => Number(q.setNumber) === Number(currentSet))?.image3 ? (
+                                <img 
+                                  src={questions.find(q => Number(q.setNumber) === Number(currentSet)).image3} 
+                                  className="w-full rounded shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
+                                  onClick={() => window.open(questions.find(q => Number(q.setNumber) === Number(currentSet)).image3, '_blank')}
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="h-32 bg-gray-50 rounded border border-dashed flex items-center justify-center text-gray-300 text-[10px]">Tiada Imej</div>
                               )}
                            </div>
                         </div>
@@ -971,23 +1039,84 @@ export default function App() {
                             </div>
                          </div>
                          <div className="space-y-4">
-                            <div className="grid grid-cols-4 gap-2">
-                               {['p', 'a', 'b', 'c', 'd', 'e', 'k', 'bah'].map(key => (
-                                 <div key={key}>
-                                   <label className="text-[10px] uppercase font-bold text-gray-400 block text-center">{key}</label>
-                                   <input 
+                            <div className="grid grid-cols-2 gap-4">
+                               <div className="space-y-2 col-span-2">
+                                  <label className="text-[10px] uppercase font-bold text-gray-400">Pendahuluan (Max 2)</label>
+                                  <input 
                                     type="number" 
-                                    value={(marksInput as any)[key]}
-                                    onChange={(e) => setMarksInput({...marksInput, [key]: parseInt(e.target.value || '0')})}
-                                    className="w-full p-2 border rounded text-center" 
-                                   />
-                                 </div>
-                               ))}
+                                    max={2}
+                                    value={marksInput.pend}
+                                    onChange={(e) => setMarksInput({...marksInput, pend: Math.min(parseInt(e.target.value || '0'), 2)})}
+                                    className="w-full p-2 border rounded" 
+                                  />
+                               </div>
+
+                               <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                                  <p className="text-[10px] font-bold text-indigo-600 uppercase">Fokus 1 (Inisiatif)</p>
+                                  <div>
+                                    <label className="text-[9px] text-gray-500 block">Bahan 1 (Max 5)</label>
+                                    <input type="number" value={marksInput.f1b1} onChange={(e) => setMarksInput({...marksInput, f1b1: Math.min(parseInt(e.target.value || '0'), 5)})} className="w-full p-1 border rounded text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-gray-500 block">Bahan 2 (Max 1)</label>
+                                    <input type="number" value={marksInput.f1b2} onChange={(e) => setMarksInput({...marksInput, f1b2: Math.min(parseInt(e.target.value || '0'), 1)})} className="w-full p-1 border rounded text-sm" />
+                                  </div>
+                               </div>
+
+                               <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                                  <p className="text-[10px] font-bold text-indigo-600 uppercase">Fokus 2 (Kebaikan)</p>
+                                  <div>
+                                    <label className="text-[9px] text-gray-500 block">Bahan 1 (Max 3)</label>
+                                    <input type="number" value={marksInput.f2b1} onChange={(e) => setMarksInput({...marksInput, f2b1: Math.min(parseInt(e.target.value || '0'), 3)})} className="w-full p-1 border rounded text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-gray-500 block">Bahan 2 (Max 1)</label>
+                                    <input type="number" value={marksInput.f2b2} onChange={(e) => setMarksInput({...marksInput, f2b2: Math.min(parseInt(e.target.value || '0'), 1)})} className="w-full p-1 border rounded text-sm" />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] text-gray-500 block">Bahan 3 (Max 2)</label>
+                                    <input type="number" value={marksInput.f2b3} onChange={(e) => setMarksInput({...marksInput, f2b3: Math.min(parseInt(e.target.value || '0'), 2)})} className="w-full p-1 border rounded text-sm" />
+                                  </div>
+                               </div>
+
+                               <div className="space-y-2">
+                                  <label className="text-[10px] uppercase font-bold text-gray-400">Penutup (Max 2)</label>
+                                  <input 
+                                    type="number" 
+                                    max={2}
+                                    value={marksInput.kes}
+                                    onChange={(e) => setMarksInput({...marksInput, kes: Math.min(parseInt(e.target.value || '0'), 2)})}
+                                    className="w-full p-2 border rounded" 
+                                  />
+                               </div>
+
+                               <div className="space-y-2">
+                                  <label className="text-[10px] uppercase font-bold text-gray-400">Bahasa (Max 10)</label>
+                                  <input 
+                                    type="number" 
+                                    max={10}
+                                    value={marksInput.bah}
+                                    onChange={(e) => setMarksInput({...marksInput, bah: Math.min(parseInt(e.target.value || '0'), 10)})}
+                                    className="w-full p-2 border rounded" 
+                                  />
+                               </div>
                             </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-4">
+                               <div className="bg-gray-100 p-2 rounded text-center">
+                                  <p className="text-[9px] uppercase text-gray-500">Bilangan Isi</p>
+                                  <p className="font-bold">{marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3} / 8</p>
+                               </div>
+                               <div className="bg-gray-100 p-2 rounded text-center">
+                                  <p className="text-[9px] uppercase text-gray-500">Markah Isi</p>
+                                  <p className="font-bold">{Math.min(marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3, 8) * 2} / 16</p>
+                               </div>
+                            </div>
+
                             <div className="bg-indigo-600 p-4 rounded-xl text-white text-center">
                                <p className="text-xs uppercase">Jumlah Keseluruhan</p>
                                <h2 className="text-3xl font-bold">
-                                 {Math.min(((marksInput.p + marksInput.a + marksInput.b + marksInput.c + marksInput.d + marksInput.e + marksInput.k) * 2) + marksInput.bah, 30)} / 30
+                                 {Math.min(marksInput.pend + (Math.min(marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3, 8) * 2) + marksInput.kes + marksInput.bah, 30)} / 30
                                </h2>
                             </div>
                             <button onClick={handleSaveMarkah} className="w-full py-3 bg-orange-600 text-white font-bold rounded-xl">Hantar Markah</button>
