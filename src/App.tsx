@@ -216,6 +216,7 @@ export default function App() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [selectedClassDaftar, setSelectedClassDaftar] = useState('Semua');
+  const [selectedClassAnalisis, setSelectedClassAnalisis] = useState('Semua');
 
   const [user, setUser] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -603,7 +604,7 @@ export default function App() {
                     })
                     .sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name))
                     .map(s => (
-                      <option key={s.name} value={s.name}>[{s.class}] {s.name}</option>
+                      <option key={s.name} value={s.name}>{s.name}</option>
                     ));
                   })()}
                 </select>
@@ -1186,12 +1187,31 @@ export default function App() {
                )}
                 {activeGuruTab === 'analisis' && (
                   <div className="space-y-6">
-                    <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                      <h3 className="text-xl font-bold text-gray-800">Analisis Tahap Penguasaan (TP)</h3>
-                      <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> 24-30 (CEMERLANG) / TP 5-6</div>
-                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 15-23 (BAIK) / TP 3-4</div>
-                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 0-14 (LEMAH) / TP 1-2</div>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between bg-white p-6 rounded-xl shadow-sm border border-gray-100 gap-4">
+                      <div className="flex flex-col gap-1">
+                        <h3 className="text-xl font-bold text-gray-800">Analisis Tahap Penguasaan (TP)</h3>
+                        <div className="flex gap-4 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                          <div className="flex items-center gap-1.5"><span className="w-2 rounded-full bg-green-500 aspect-square"></span> 24-30 (TP 5-6)</div>
+                          <div className="flex items-center gap-1.5"><span className="w-2 rounded-full bg-blue-500 aspect-square"></span> 15-23 (TP 3-4)</div>
+                          <div className="flex items-center gap-1.5"><span className="w-2 rounded-full bg-red-500 aspect-square"></span> 0-14 (TP 1-2)</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 ml-auto">
+                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tapis Kelas:</label>
+                         <select 
+                            value={selectedClassAnalisis}
+                            onChange={(e) => setSelectedClassAnalisis(e.target.value)}
+                            className="px-4 py-2 border rounded-xl bg-gray-50 shadow-sm font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                         >
+                            <option value="Semua">Semua Kelas</option>
+                            {Array.from(new Set([
+                              ...students.map(s => s.class),
+                              ...ALL_STUDENTS_DATA.map(s => s.form)
+                            ].filter(Boolean))).sort().map(c => (
+                               <option key={c} value={c}>{c}</option>
+                            ))}
+                         </select>
                       </div>
                     </div>
 
@@ -1218,6 +1238,7 @@ export default function App() {
                               };
                             })
                             .sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name))
+                            .filter(student => selectedClassAnalisis === 'Semua' || student.class === selectedClassAnalisis)
                             .map(student => {
                               const studentId = student.id;
                               return (
