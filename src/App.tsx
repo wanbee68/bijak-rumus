@@ -215,6 +215,7 @@ export default function App() {
   });
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedClassDaftar, setSelectedClassDaftar] = useState('Semua');
 
   const [user, setUser] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -593,12 +594,18 @@ export default function App() {
                 >
                   <option value="">-- Pilih Nama --</option>
                   {/* Combine Firestore students and hardcoded students, removing duplicates by name */}
-                  {Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]))
-                    .sort((a, b) => a.localeCompare(b))
-                    .map(name => (
-                      <option key={name} value={name}>{name}</option>
-                    ))
-                  }
+                  {(() => {
+                    const uniqueNames = Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]));
+                    return uniqueNames.map(name => {
+                      const s = students.find(item => item.name === name);
+                      const sd = ALL_STUDENTS_DATA.find(item => item.nama === name);
+                      return { name, class: s?.class || sd?.form || '' };
+                    })
+                    .sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name))
+                    .map(s => (
+                      <option key={s.name} value={s.name}>[{s.class}] {s.name}</option>
+                    ));
+                  })()}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -907,24 +914,53 @@ export default function App() {
                     <button onClick={handleBulkImport} className="px-8 py-3 bg-green-600 text-white font-bold rounded-xl">Proses Import</button>
                     
                     <div className="mt-8">
-                      <h4 className="font-bold mb-4">Senarai Pelajar Terdaftar ({students.length})</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
+                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                          <h4 className="font-bold text-gray-800 text-lg">Senarai Pelajar Terdaftar ({students.length})</h4>
+                          
+                          <div className="flex items-center gap-3">
+                             <label className="text-sm font-bold text-gray-500 uppercase tracking-wider">Tapis Kelas:</label>
+                             <select 
+                                value={selectedClassDaftar}
+                                onChange={(e) => setSelectedClassDaftar(e.target.value)}
+                                className="px-4 py-2 border rounded-xl bg-white shadow-sm font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-500"
+                             >
+                                <option value="Semua">Semua Kelas</option>
+                                {Array.from(new Set(students.map(s => s.class).filter(Boolean))).sort().map(c => (
+                                   <option key={c} value={c}>{c}</option>
+                                ))}
+                             </select>
+                          </div>
+                       </div>
+                      <div className="overflow-x-auto border rounded-2xl bg-white shadow-sm overflow-hidden">
+                        <table className="w-full text-left text-sm border-collapse">
                           <thead>
-                            <tr className="border-b">
-                              <th className="py-2">Nama</th>
-                              <th className="py-2">IC</th>
-                              <th className="py-2">Kelas</th>
+                            <tr className="bg-gray-50 border-b">
+                              <th className="py-4 px-6 font-bold text-gray-600 uppercase tracking-widest text-[10px]">Nama</th>
+                              <th className="py-4 px-6 font-bold text-gray-600 uppercase tracking-widest text-[10px]">IC / Maktab</th>
+                              <th className="py-4 px-6 font-bold text-gray-600 uppercase tracking-widest text-[10px]">Kelas</th>
                             </tr>
                           </thead>
-                          <tbody>
-                            {students.sort((a,b) => a.name.localeCompare(b.name)).map(s => (
-                              <tr key={s.id} className="border-b hover:bg-gray-50">
-                                <td className="py-2">{s.name}</td>
-                                <td className="py-2">{s.ic}</td>
-                                <td className="py-2">{s.class}</td>
-                              </tr>
+                          <tbody className="divide-y">
+                            {students
+                             .filter(s => selectedClassDaftar === 'Semua' || s.class === selectedClassDaftar)
+                             .sort((a,b) => {
+                               const classCompare = (a.class || '').localeCompare(b.class || '');
+                               return classCompare !== 0 ? classCompare : a.name.localeCompare(b.name);
+                             })
+                             .map(s => (
+                               <tr key={s.id} className="hover:bg-blue-50/50 transition-colors">
+                                 <td className="py-4 px-6 font-medium text-gray-800">{s.name}</td>
+                                 <td className="py-4 px-6 text-gray-500 font-mono">{s.ic}</td>
+                                 <td className="py-4 px-6">
+                                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black uppercase">{s.class}</span>
+                                 </td>
+                               </tr>
                             ))}
+                            {students.filter(s => selectedClassDaftar === 'Semua' || s.class === selectedClassDaftar).length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="py-12 text-center text-gray-400 italic">Tiada pelajar ditemui untuk kelas ini.</td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -1037,12 +1073,18 @@ export default function App() {
                          className="flex-1 p-3 border rounded-lg"
                         >
                           <option value="">Pilih Pelajar</option>
-                          {Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]))
-                            .sort((a, b) => a.localeCompare(b))
-                            .map(name => (
-                              <option key={name} value={name}>{name}</option>
-                            ))
-                          }
+                          {(() => {
+                            const uniqueNames = Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]));
+                            return uniqueNames.map(name => {
+                              const s = students.find(item => item.name === name);
+                              const sd = ALL_STUDENTS_DATA.find(item => item.nama === name);
+                              return { name, class: s?.class || sd?.form || '' };
+                            })
+                            .sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name))
+                            .map(s => (
+                              <option key={s.name} value={s.name}>[{s.class}] {s.name}</option>
+                            ));
+                          })()}
                         </select>
                        <select 
                         value={penandaSet}
@@ -1164,13 +1206,28 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]))
-                            .sort((a, b) => a.localeCompare(b))
-                            .map(name => {
-                              const studentId = students.find(s => s.name === name)?.ic || ALL_STUDENTS_DATA.find(s => s.nama === name)?.ic;
+                          {(() => {
+                            const uniqueNames = Array.from(new Set([...students.map(s => s.name), ...ALL_STUDENTS_DATA.map(s => s.nama)]));
+                            return uniqueNames.map(name => {
+                              const s = students.find(item => item.name === name);
+                              const sd = ALL_STUDENTS_DATA.find(item => item.nama === name);
+                              return { 
+                                name, 
+                                class: s?.class || sd?.form || '',
+                                id: s?.ic || sd?.ic
+                              };
+                            })
+                            .sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name))
+                            .map(student => {
+                              const studentId = student.id;
                               return (
-                                <tr key={name} className="hover:bg-gray-50 transition-colors">
-                                  <td className="p-3 border font-medium sticky left-0 bg-white z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] whitespace-nowrap">{name}</td>
+                                <tr key={student.name} className="hover:bg-gray-50 transition-colors">
+                                  <td className="p-3 border font-medium sticky left-0 bg-white z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] whitespace-nowrap">
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-indigo-500 font-bold">{student.class}</span>
+                                      <span>{student.name}</span>
+                                    </div>
+                                  </td>
                                   {Array.from({ length: 30 }, (_, i) => i + 1).map(set => {
                                     const mark = marks.find(m => m.studentId === studentId && Number(m.setNumber) === Number(set));
                                     return (
@@ -1185,8 +1242,8 @@ export default function App() {
                                   })}
                                 </tr>
                               );
-                            })
-                          }
+                            });
+                          })()}
                         </tbody>
                       </table>
                     </div>
