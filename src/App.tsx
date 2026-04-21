@@ -14,7 +14,9 @@ import {
   setDoc, 
   doc,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  serverTimestamp,
+  getDocFromServer
 } from 'firebase/firestore';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
@@ -158,6 +160,27 @@ export default function App() {
     const saved = localStorage.getItem('bijak_rumus_active_guru_tab');
     return (saved as any) || 'daftar';
   });
+
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        console.log("Checking Firestore connection...");
+        // Success here means the backend responded, even if the doc doesn't exist
+        await getDocFromServer(doc(db, '_connection_test_', 'ping'));
+        console.log("Firestore connection: OK");
+      } catch (error: any) {
+        if (error.code === 'unavailable') {
+          console.error("Firestore backend unreachable (Network issue).");
+        } else if (error.code === 'permission-denied') {
+          // This actually means we DID connect to the backend but rules blocked us
+          console.log("Firestore connection: OK (Backend reached, but check restricted by rules).");
+        } else {
+          console.error("Firestore health info:", error.message);
+        }
+      }
+    };
+    testConnection();
+  }, []);
   
   const [toast, setToast] = useState<{ msg: string; color: string } | null>(null);
   const [wordCount, setWordCount] = useState(0);
@@ -182,11 +205,11 @@ export default function App() {
   const [markingSession, setMarkingSession] = useState<any>(null);
   const [marksInput, setMarksInput] = useState({ 
     pend: 0, 
-    f1b1: 0, 
-    f1b2: 0, 
-    f2b1: 0, 
-    f2b2: 0, 
-    f2b3: 0, 
+    boxA: 0, 
+    boxB: 0, 
+    boxC: 0, 
+    boxD: 0, 
+    boxE: 0, 
     kes: 0, 
     bah: 0 
   });
@@ -345,11 +368,11 @@ export default function App() {
     setMarkingSession(null);
     setMarksInput({ 
       pend: 0, 
-      f1b1: 0, 
-      f1b2: 0, 
-      f2b1: 0, 
-      f2b2: 0, 
-      f2b3: 0, 
+      boxA: 0, 
+      boxB: 0, 
+      boxC: 0, 
+      boxD: 0, 
+      boxE: 0, 
       kes: 0, 
       bah: 0 
     });
@@ -493,8 +516,8 @@ export default function App() {
   };
 
   const handleSaveMarkah = async () => {
-    const { pend, f1b1, f1b2, f2b1, f2b2, f2b3, kes, bah } = marksInput;
-    const totalIsi = f1b1 + f1b2 + f2b1 + f2b2 + f2b3;
+    const { pend, boxA, boxB, boxC, boxD, boxE, kes, bah } = marksInput;
+    const totalIsi = boxA + boxB + boxC + boxD + boxE;
     const isiMarkah = Math.min(totalIsi, 8) * 2;
     const totalIsiPlusPendKes = pend + isiMarkah + kes;
     const grandTotal = Math.min(totalIsiPlusPendKes + bah, 30);
@@ -503,11 +526,12 @@ export default function App() {
       answerId: markingSession.id,
       studentId: markingSession.studentId,
       setNumber: markingSession.setNumber,
-      marks: marksInput, // Save the detailed breakdown
+      marks: marksInput,
       isiTotal: totalIsi,
       isiMarkah: isiMarkah,
       bahMark: bah,
-      grandTotal
+      grandTotal,
+      markedAt: serverTimestamp()
     };
 
     try {
@@ -662,15 +686,15 @@ export default function App() {
             {activeTab === 'kerja' ? (
               <div className="space-y-6">
                 {questions.length === 0 && (
-                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-xl mb-4">
-                    <p className="text-amber-700 text-sm font-bold">⚠️ Belum Ada Soalan</p>
-                    <p className="text-amber-600 text-xs">Guru belum memuat naik sebarang set soalan. Sila hubungi guru anda.</p>
+                  <div className="bg-amber-100 border border-amber-300 p-4 rounded-lg">
+                    <p className="text-amber-800 font-bold">Belum Ada Soalan</p>
+                    <p className="text-amber-700 text-xs">Guru belum memuat naik sebarang set soalan.</p>
                   </div>
                 )}
                 
-                <div className="bg-white rounded-2xl p-6 shadow-sm">
-                  <h3 className="font-bold mb-4 text-gray-800">Pilih Set Latihan:</h3>
-                  <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+                <div className="bg-white border rounded-xl p-6">
+                  <h3 className="font-bold mb-4">Pilih Set Latihan:</h3>
+                  <div className="flex flex-wrap gap-2">
                     {Array.from({ length: 30 }, (_, i) => i + 1).map(num => {
                       const hasQuestion = questions.some(q => Number(q.setNumber) === num);
                       const isSelected = currentSet === num;
@@ -680,167 +704,168 @@ export default function App() {
                         <button 
                           key={num}
                           onClick={() => selectSet(num)}
-                          className={`w-10 h-10 flex flex-col items-center justify-center font-bold border-2 rounded-lg text-xs transition-all relative ${
+                          className={`w-10 h-10 flex flex-col items-center justify-center font-bold border rounded-lg text-xs transition-all relative ${
                             isSelected 
-                              ? 'bg-indigo-600 text-white border-indigo-600' 
+                              ? 'bg-blue-600 text-white border-blue-600' 
                               : hasQuestion 
-                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:border-indigo-400' 
-                                : 'bg-white border-gray-100 text-gray-300 hover:border-gray-300'
+                                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400' 
+                                : 'bg-gray-50 border-gray-200 text-gray-400'
                           }`}
                         >
                           {num}
-                          {isAnswered && !isSelected && (
+                          {isAnswered && (
                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                           )}
                         </button>
                       );
                     })}
                   </div>
-                  {!currentSet && (
-                    <div className="mt-6 p-10 border-2 border-dashed border-indigo-100 rounded-2xl text-center">
-                      <p className="text-indigo-400 font-medium">Sila pilih nombor set di atas untuk mula menjawab.</p>
-                      <p className="text-xs text-indigo-300 mt-1">Set yang berwarna biru mempunyai soalan.</p>
-                    </div>
-                  )}
                 </div>
 
                 {currentSet && (
-                  <div className="space-y-6 animate-in fade-in duration-500">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
-                          <h4 className="font-bold text-blue-700 mb-1 text-sm uppercase tracking-wider">ARAHAN:</h4>
-                          <p className="text-gray-700 text-sm italic">
-                            {questions.find(q => Number(q.setNumber) === Number(currentSet))?.instruction || 'Tiada arahan disediakan untuk set ini.'}
-                          </p>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                          <h4 className="font-bold text-gray-800 mb-3 border-b pb-2 flex justify-between items-center text-sm uppercase tracking-wider">
-                            <span>BAHAN 1: PETIKAN</span>
-                            <span className="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">Set {currentSet}</span>
-                          </h4>
-                          <div className="text-gray-700 leading-relaxed text-sm whitespace-pre-wrap">
-                            {questions.find(q => Number(q.setNumber) === Number(currentSet))?.text1 || 'Soalan bagi set ini belum sedia atau belum dimuat naik oleh guru.'}
+                  <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
+                    {/* MATERIALS SECTION */}
+                    <div className="bg-white border rounded-xl p-6 shadow-sm">
+                      <div className="mb-6">
+                        <h4 className="font-bold text-lg mb-2 text-blue-800">ARAHAN:</h4>
+                        <p className="p-4 bg-gray-50 border rounded-lg italic">
+                          {questions.find(q => Number(q.setNumber) === Number(currentSet))?.instruction || 'Tiada arahan disediakan.'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="border rounded-lg overflow-hidden">
+                          <h4 className="bg-gray-100 p-3 font-bold border-b">BAHAN 1: PETIKAN</h4>
+                          <div className="p-4 text-justify whitespace-pre-wrap leading-relaxed">
+                            {questions.find(q => Number(q.setNumber) === Number(currentSet))?.text1 || 'Soalan belum tersedia.'}
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                              <h4 className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">BAHAN 2</h4>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="border rounded-lg overflow-hidden">
+                            <h4 className="bg-gray-100 p-3 font-bold border-b text-sm text-center">BAHAN 2</h4>
+                            <div className="p-4 flex items-center justify-center bg-gray-50 min-h-[200px]">
                               {questions.find(q => Number(q.setNumber) === Number(currentSet))?.image2 ? (
                                 <img 
                                   src={questions.find(q => Number(q.setNumber) === Number(currentSet)).image2} 
-                                  className="w-full rounded shadow-sm hover:scale-[1.02] transition-transform cursor-pointer" 
+                                  className="max-h-96 rounded shadow-sm cursor-pointer hover:scale-[1.02] transition-transform" 
                                   onClick={() => window.open(questions.find(q => Number(q.setNumber) === Number(currentSet)).image2, '_blank')}
                                   referrerPolicy="no-referrer"
                                 />
                               ) : (
-                                <div className="h-32 bg-gray-50 rounded border border-dashed flex items-center justify-center text-gray-300 text-[10px]">Tiada Imej</div>
+                                <span className="text-gray-400 text-xs">Tiada Imej</span>
                               )}
-                           </div>
-                           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                              <h4 className="text-[10px] font-bold text-gray-400 mb-2 uppercase tracking-widest">BAHAN 3</h4>
+                            </div>
+                          </div>
+                          <div className="border rounded-lg overflow-hidden">
+                            <h4 className="bg-gray-100 p-3 font-bold border-b text-sm text-center">BAHAN 3</h4>
+                            <div className="p-4 flex items-center justify-center bg-gray-50 min-h-[200px]">
                               {questions.find(q => Number(q.setNumber) === Number(currentSet))?.image3 ? (
                                 <img 
                                   src={questions.find(q => Number(q.setNumber) === Number(currentSet)).image3} 
-                                  className="w-full rounded shadow-sm hover:scale-[1.02] transition-transform cursor-pointer"
+                                  className="max-h-96 rounded shadow-sm cursor-pointer hover:scale-[1.02] transition-transform"
                                   onClick={() => window.open(questions.find(q => Number(q.setNumber) === Number(currentSet)).image3, '_blank')}
                                   referrerPolicy="no-referrer"
                                 />
                               ) : (
-                                <div className="h-32 bg-gray-50 rounded border border-dashed flex items-center justify-center text-gray-300 text-[10px]">Tiada Imej</div>
+                                <span className="text-gray-400 text-xs">Tiada Imej</span>
                               )}
-                           </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-[600px]">
-                        <h4 className="font-bold text-gray-800 mb-4 flex justify-between items-center">
-                          RUANG JAWAPAN 
-                          <span className={`text-xs px-3 py-1 rounded-full ${wordCount > 120 ? 'text-red-600 bg-red-50 font-bold' : 'text-indigo-600 bg-indigo-50'}`}>
-                            {wordCount} / 120 patah perkataan
-                          </span>
-                        </h4>
-                        <textarea 
-                          value={jawapanText}
-                          onChange={(e) => updateWordCount(e.target.value)}
-                          className="flex-grow w-full p-4 border-2 border-indigo-100 rounded-2xl focus:border-indigo-500 outline-none text-sm leading-relaxed resize-none" 
-                          placeholder="Taip rumusan lengkap anda di sini..."
-                        />
-                        <div className="mt-4 flex gap-3">
-                          <button 
-                            onClick={() => setShowPreview(true)}
-                            className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200"
-                          >
-                            👁️ Preview
-                          </button>
-                          <button onClick={saveJawapan} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700">💾 Simpan</button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {showPreview && (
-                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                      <div className="p-6 border-b flex justify-between items-center bg-indigo-600 text-white">
-                        <h3 className="font-bold text-xl">Preview Jawapan (Set {currentSet})</h3>
-                        <button onClick={() => setShowPreview(false)} className="text-white hover:text-indigo-200">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+                    {/* ANSWER SECTION */}
+                    <div className="bg-white border rounded-xl p-6 shadow-sm">
+                      <div className="flex justify-between items-center mb-4">
+                        <h4 className="font-bold text-lg uppercase tracking-wide text-indigo-700">Ruang Jawapan</h4>
+                        <span className={`text-sm font-bold ${wordCount > 120 ? 'text-red-600' : 'text-blue-600'}`}>
+                          Bilangan Perkataan: {wordCount} / 120
+                        </span>
                       </div>
-                      <div className="p-8 overflow-y-auto bg-gray-50">
-                        <div className="bg-white p-8 rounded-2xl shadow-inner border border-gray-100 min-h-[300px]">
-                          <p className="text-gray-800 leading-relaxed whitespace-pre-wrap text-lg">
-                            {jawapanText || <span className="text-gray-400 italic">Tiada jawapan ditulis lagi...</span>}
-                          </p>
-                        </div>
-                        <div className="mt-6 flex justify-between items-center text-sm">
-                          <span className="text-gray-500">Jumlah Perkataan: <span className="font-bold text-indigo-600">{wordCount}</span></span>
-                          <button 
-                            onClick={() => setShowPreview(false)}
-                            className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl"
-                          >
-                            Tutup Preview
-                          </button>
-                        </div>
+                      <textarea 
+                        value={jawapanText}
+                        onChange={(e) => updateWordCount(e.target.value)}
+                        className="w-full p-6 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none min-h-[350px] leading-relaxed text-lg" 
+                        placeholder="Taip rumusan anda di sini..."
+                      />
+                      <div className="mt-4 flex gap-4">
+                        <button 
+                          onClick={() => setShowPreview(true)}
+                          className="flex-1 py-4 bg-gray-100 font-bold rounded-xl hover:bg-gray-200 transition-colors"
+                        >
+                          👁️ PREVIEW
+                        </button>
+                        <button onClick={saveJawapan} className="flex-1 py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition-all">
+                          💾 SIMPAN JAWAPAN
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl p-6 shadow-sm">
-                 <h3 className="font-bold text-xl mb-4">Arkib Latihan Anda</h3>
-                 <div className="space-y-4">
-                    {answers.filter(a => a.studentId === currentUser.id).length > 0 ? (
-                      answers.filter(a => a.studentId === currentUser.id).map(a => (
-                        <div key={a.id} className="p-4 bg-gray-50 rounded-xl border flex justify-between items-center">
-                          <div>
-                            <h4 className="font-bold">Set {a.setNumber}</h4>
-                            <p className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {marks.find(m => m.answerId === a.id) && (
-                              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                                Markah: {marks.find(m => m.answerId === a.id).grandTotal}/30
-                              </span>
-                            )}
-                            <button 
-                              onClick={() => handleEditAnswer(a)}
-                              className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-200"
-                            >
-                              ✏️ Edit
-                            </button>
-                          </div>
+              <div className="bg-white border rounded-xl p-6">
+                <h3 className="font-bold text-xl mb-4">Arkib Latihan Anda</h3>
+                <div className="space-y-4">
+                  {answers.filter(a => a.studentId === currentUser.id).length > 0 ? (
+                    answers.filter(a => a.studentId === currentUser.id).map(a => (
+                      <div key={a.id} className="p-4 bg-gray-50 rounded-xl border flex justify-between items-center">
+                        <div>
+                          <h4 className="font-bold">Set {a.setNumber}</h4>
+                          <p className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</p>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-center text-gray-400 py-10">Tiada latihan dihantar.</p>
-                    )}
-                 </div>
+                        <div className="flex items-center gap-2">
+                          {marks.find(m => m.answerId === a.id) && (
+                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                              Markah: {marks.find(m => m.answerId === a.id).grandTotal}/30
+                            </span>
+                          )}
+                          <button 
+                            onClick={() => handleEditAnswer(a)}
+                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-bold hover:bg-blue-200"
+                          >
+                            ✏️ Edit
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-gray-400 py-10">Tiada latihan dihantar.</p>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {showPreview && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                  <div className="p-6 border-b flex justify-between items-center bg-blue-600 text-white">
+                    <h3 className="font-bold text-xl">Preview Jawapan (Set {currentSet})</h3>
+                    <button onClick={() => setShowPreview(false)} className="text-white hover:text-blue-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-8 overflow-y-auto bg-gray-50">
+                    <div className="bg-white p-8 rounded-2xl shadow-inner border border-gray-100 min-h-[300px]">
+                      <p className="text-gray-800 leading-relaxed whitespace-pre-wrap text-lg">
+                        {jawapanText || <span className="text-gray-400 italic">Tiada jawapan ditulis lagi...</span>}
+                      </p>
+                    </div>
+                    <div className="mt-6 flex justify-between items-center text-sm">
+                      <span className="text-gray-500">Jumlah Perkataan: <span className="font-bold text-blue-600">{wordCount}</span></span>
+                      <button 
+                        onClick={() => setShowPreview(false)}
+                        className="px-6 py-2 bg-blue-600 text-white font-bold rounded-xl"
+                      >
+                        Tutup Preview
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1037,104 +1062,104 @@ export default function App() {
                             <div className="text-sm leading-relaxed p-4 bg-white rounded-lg border whitespace-pre-wrap">
                               {markingSession.content}
                             </div>
-                         </div>
-                         <div className="space-y-4">
+                          </div>
+                          <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                               <div className="space-y-2 col-span-2">
+                               <div className="space-y-1">
                                   <label className="text-[10px] uppercase font-bold text-gray-400">Pendahuluan (Max 2)</label>
                                   <input 
                                     type="number" 
-                                    max={2}
                                     value={marksInput.pend}
                                     onChange={(e) => setMarksInput({...marksInput, pend: Math.min(parseInt(e.target.value || '0'), 2)})}
-                                    className="w-full p-2 border rounded" 
+                                    className="w-full p-2 border rounded text-sm" 
                                   />
                                </div>
-
-                               <div className="p-3 bg-gray-50 rounded-lg space-y-2">
-                                  <p className="text-[10px] font-bold text-indigo-600 uppercase">Fokus 1 (Inisiatif)</p>
-                                  <div>
-                                    <label className="text-[9px] text-gray-500 block">Bahan 1 (Max 5)</label>
-                                    <input type="number" value={marksInput.f1b1} onChange={(e) => setMarksInput({...marksInput, f1b1: Math.min(parseInt(e.target.value || '0'), 5)})} className="w-full p-1 border rounded text-sm" />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] text-gray-500 block">Bahan 2 (Max 1)</label>
-                                    <input type="number" value={marksInput.f1b2} onChange={(e) => setMarksInput({...marksInput, f1b2: Math.min(parseInt(e.target.value || '0'), 1)})} className="w-full p-1 border rounded text-sm" />
-                                  </div>
-                               </div>
-
-                               <div className="p-3 bg-gray-50 rounded-lg space-y-2">
-                                  <p className="text-[10px] font-bold text-indigo-600 uppercase">Fokus 2 (Kebaikan)</p>
-                                  <div>
-                                    <label className="text-[9px] text-gray-500 block">Bahan 1 (Max 3)</label>
-                                    <input type="number" value={marksInput.f2b1} onChange={(e) => setMarksInput({...marksInput, f2b1: Math.min(parseInt(e.target.value || '0'), 3)})} className="w-full p-1 border rounded text-sm" />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] text-gray-500 block">Bahan 2 (Max 1)</label>
-                                    <input type="number" value={marksInput.f2b2} onChange={(e) => setMarksInput({...marksInput, f2b2: Math.min(parseInt(e.target.value || '0'), 1)})} className="w-full p-1 border rounded text-sm" />
-                                  </div>
-                                  <div>
-                                    <label className="text-[9px] text-gray-500 block">Bahan 3 (Max 2)</label>
-                                    <input type="number" value={marksInput.f2b3} onChange={(e) => setMarksInput({...marksInput, f2b3: Math.min(parseInt(e.target.value || '0'), 2)})} className="w-full p-1 border rounded text-sm" />
-                                  </div>
-                               </div>
-
-                               <div className="space-y-2">
-                                  <label className="text-[10px] uppercase font-bold text-gray-400">Penutup (Max 2)</label>
+                               <div className="space-y-1">
+                                  <label className="text-[10px] uppercase font-bold text-gray-400">Kesimpulan (Max 2)</label>
                                   <input 
                                     type="number" 
-                                    max={2}
                                     value={marksInput.kes}
                                     onChange={(e) => setMarksInput({...marksInput, kes: Math.min(parseInt(e.target.value || '0'), 2)})}
-                                    className="w-full p-2 border rounded" 
+                                    className="w-full p-2 border rounded text-sm" 
                                   />
                                </div>
 
-                               <div className="space-y-2">
-                                  <label className="text-[10px] uppercase font-bold text-gray-400">Bahasa (Max 10)</label>
+                               <div className="col-span-2 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                                  <p className="text-xs font-bold text-indigo-700 mb-3 uppercase tracking-wider">Bilangan Isi (1 Isi = 2 Markah | Max 6 per kotak)</p>
+                                  <div className="grid grid-cols-5 gap-2">
+                                     {[
+                                       { label: 'A', key: 'boxA' },
+                                       { label: 'B', key: 'boxB' },
+                                       { label: 'C', key: 'boxC' },
+                                       { label: 'D', key: 'boxD' },
+                                       { label: 'E', key: 'boxE' }
+                                     ].map((item) => (
+                                       <div key={item.key} className="text-center">
+                                          <label className="text-[10px] font-bold text-gray-500 block mb-1">{item.label}</label>
+                                          <input 
+                                            type="number" 
+                                            value={(marksInput as any)[item.key]} 
+                                            onChange={(e) => setMarksInput({...marksInput, [item.key]: Math.min(parseInt(e.target.value || '0'), 6)})} 
+                                            className="w-full p-2 border rounded text-center font-bold text-indigo-600" 
+                                          />
+                                       </div>
+                                     ))}
+                                  </div>
+                               </div>
+
+                               <div className="col-span-2 space-y-1">
+                                  <label className="text-[10px] uppercase font-bold text-gray-400">Markah Bahasa (Maksimum 10)</label>
                                   <input 
                                     type="number" 
                                     max={10}
                                     value={marksInput.bah}
                                     onChange={(e) => setMarksInput({...marksInput, bah: Math.min(parseInt(e.target.value || '0'), 10)})}
-                                    className="w-full p-2 border rounded" 
+                                    className="w-full p-2 border rounded font-bold" 
                                   />
                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 mt-4">
                                <div className="bg-gray-100 p-2 rounded text-center">
-                                  <p className="text-[9px] uppercase text-gray-500">Bilangan Isi</p>
-                                  <p className="font-bold">{marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3} / 8</p>
+                                  <p className="text-[9px] uppercase text-gray-500">Jumlah Isi (A-E)</p>
+                                  <p className="font-bold text-lg">{marksInput.boxA + marksInput.boxB + marksInput.boxC + marksInput.boxD + marksInput.boxE}</p>
                                </div>
                                <div className="bg-gray-100 p-2 rounded text-center">
-                                  <p className="text-[9px] uppercase text-gray-500">Markah Isi</p>
-                                  <p className="font-bold">{Math.min(marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3, 8) * 2} / 16</p>
+                                  <p className="text-[9px] uppercase text-gray-500">Markah Isi (Max 16)</p>
+                                  <p className="font-bold text-lg text-indigo-600">{Math.min(marksInput.boxA + marksInput.boxB + marksInput.boxC + marksInput.boxD + marksInput.boxE, 8) * 2}</p>
                                </div>
                             </div>
 
-                            <div className="bg-indigo-600 p-4 rounded-xl text-white text-center">
-                               <p className="text-xs uppercase">Jumlah Keseluruhan</p>
-                               <h2 className="text-3xl font-bold">
-                                 {Math.min(marksInput.pend + (Math.min(marksInput.f1b1 + marksInput.f1b2 + marksInput.f2b1 + marksInput.f2b2 + marksInput.f2b3, 8) * 2) + marksInput.kes + marksInput.bah, 30)} / 30
+                            <div className="bg-indigo-600 p-4 rounded-xl text-white text-center shadow-lg">
+                               <p className="text-xs uppercase tracking-widest opacity-80">Jumlah Keseluruhan</p>
+                               <h2 className="text-4xl font-black">
+                                 {Math.min(marksInput.pend + (Math.min(marksInput.boxA + marksInput.boxB + marksInput.boxC + marksInput.boxD + marksInput.boxE, 8) * 2) + marksInput.kes + marksInput.bah, 30)} / 30
                                </h2>
                             </div>
-                            <button onClick={handleSaveMarkah} className="w-full py-3 bg-orange-600 text-white font-bold rounded-xl">Hantar Markah</button>
-                         </div>
+                            <button onClick={handleSaveMarkah} className="w-full py-4 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-md transition-all">Sahkan & Hantar Markah</button>
+                          </div>
                       </div>
                     )}
                  </div>
                )}
                 {activeGuruTab === 'analisis' && (
                   <div className="space-y-6">
-                    <h3 className="text-xl font-bold">Analisis Tahap Penguasaan (TP)</h3>
+                    <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                      <h3 className="text-xl font-bold text-gray-800">Analisis Tahap Penguasaan (TP)</h3>
+                      <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500"></span> 24-30 (CEMERLANG) / TP 5-6</div>
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 15-23 (BAIK) / TP 3-4</div>
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 0-14 (LEMAH) / TP 1-2</div>
+                      </div>
+                    </div>
+
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <table className="w-full text-left text-xs border-collapse bg-white shadow-sm rounded-xl overflow-hidden">
                         <thead>
                           <tr className="bg-gray-100">
-                            <th className="p-2 border">Nama Pelajar</th>
-                            {Array.from({ length: 10 }, (_, i) => i + 1).map(set => (
-                              <th key={set} className="p-2 border text-center">Set {set}</th>
+                            <th className="p-3 border">Nama Pelajar</th>
+                            {Array.from({ length: 30 }, (_, i) => i + 1).map(set => (
+                              <th key={set} className="p-3 border text-center whitespace-nowrap min-w-[80px]">Set {set}</th>
                             ))}
                           </tr>
                         </thead>
@@ -1144,12 +1169,12 @@ export default function App() {
                             .map(name => {
                               const studentId = students.find(s => s.name === name)?.ic || ALL_STUDENTS_DATA.find(s => s.nama === name)?.ic;
                               return (
-                                <tr key={name} className="hover:bg-gray-50">
-                                  <td className="p-2 border font-medium">{name}</td>
-                                  {Array.from({ length: 10 }, (_, i) => i + 1).map(set => {
-                                    const mark = marks.find(m => m.studentId === studentId && m.setNumber === set);
+                                <tr key={name} className="hover:bg-gray-50 transition-colors">
+                                  <td className="p-3 border font-medium sticky left-0 bg-white z-10 shadow-[2px_0_4px_rgba(0,0,0,0.05)] whitespace-nowrap">{name}</td>
+                                  {Array.from({ length: 30 }, (_, i) => i + 1).map(set => {
+                                    const mark = marks.find(m => m.studentId === studentId && Number(m.setNumber) === Number(set));
                                     return (
-                                      <td key={set} className="p-2 border text-center">
+                                      <td key={set} className="p-3 border text-center">
                                         {mark ? (
                                           <span className={`font-bold ${mark.grandTotal >= 24 ? 'text-green-600' : mark.grandTotal >= 15 ? 'text-blue-600' : 'text-red-600'}`}>
                                             {mark.grandTotal}
